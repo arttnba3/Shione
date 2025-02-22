@@ -1,0 +1,12 @@
+# local test
+config.json
+local_logs/
+
+# binary example
+Shione
+
+# idea files
+.idea/
+
+# vscode files
+.vscode/

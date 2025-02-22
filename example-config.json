@@ -1,0 +1,24 @@
+{
+  "file_log_output" : true,
+  "log_dir": "./local_logs",
+  "log_flush_freq" : 1,
+  "console_log_output" : true,
+  "bot_config" : [
+    {
+      "type": "OneBot-V11",
+      "config": {
+        "http_post": {
+          "host": "127.0.0.1",
+          "port": 5900
+        },
+        "http_server": {
+          "port": 5902
+        }
+      },
+      "admin_list": [
+        114514,
+        1919810
+      ]
+    }
+  ]
+}
