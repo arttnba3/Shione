@@ -9,6 +9,13 @@ func GetDefaultOneBotV11PluginsConfig() *[]OneBotV11PluginAPI {
 				isEnabled: true,
 			},
 		},
+		&ChatPlugin{
+			OneBotV11Plugin: OneBotV11Plugin{
+				name:      "ChatPlugin",
+				command:   "/chat",
+				isEnabled: true,
+			},
+		},
 		&RepeaterPlugin{
 			OneBotV11Plugin: OneBotV11Plugin{
 				name:      "RepeaterPlugin",
