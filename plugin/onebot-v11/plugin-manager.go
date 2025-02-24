@@ -11,14 +11,10 @@ import (
 )
 
 type PluginManagerPlugin struct {
-	OneBotV11PluginConfig
+	OneBotV11Plugin
 	config.BotConfig
 	pluginSystem *OneBotV11PluginSystem
 }
-
-var pluginSystemUsage string = "Usage:\n\n" +
-	"    /plugin [operations] [plugin_Name]\n" +
-	"\nRedundant arguments will be automatically ignored\n"
 
 func (this *PluginManagerPlugin) Init(botConfig config.BotConfig, pluginSystem *OneBotV11PluginSystem) error {
 	this.BotConfig = botConfig
@@ -27,20 +23,13 @@ func (this *PluginManagerPlugin) Init(botConfig config.BotConfig, pluginSystem *
 	return nil
 }
 
-func (this *PluginManagerPlugin) IsEnabled() bool {
-	return this.isEnabled
-}
-
-func (this *PluginManagerPlugin) Enable() {
-	this.isEnabled = true
-}
-
-func (this *PluginManagerPlugin) Disable() {
-	this.isEnabled = false
-}
-
-func (this *PluginManagerPlugin) GetName() string {
-	return this.Name
+func (this *PluginManagerPlugin) GetHelpMsg() string {
+	return fmt.Sprintf(
+		"Usage:\n\n"+
+			"    %v [operations] [plugin_Name]\n"+
+			"\nRedundant arguments will be automatically ignored\n",
+		this.command,
+	)
 }
 
 func ParsePureTextMessage(logger func(...any), msgArray onebot_v11_api_message.MessageArray) (string, bool) {
@@ -77,14 +66,16 @@ func (this *PluginManagerPlugin) PermissionCheck(user int64) bool {
 func (this *PluginManagerPlugin) PluginOperationExecutor(logger func(...any), pureMsgText string, user int64) (string, bool) {
 	var messageToSend string
 
-	if pureMsgText == "/plugin" {
+	if pureMsgText == this.command {
 		if !this.PermissionCheck(user) {
 			messageToSend = "Permission denied."
 			goto out
 		} else {
-			messageToSend = pluginSystemUsage
+			messageToSend = this.GetHelpMsg()
 		}
-	} else if len(pureMsgText) > 7 && pureMsgText[:7] == "/plugin" {
+	} else if len(pureMsgText) > len(this.command) &&
+		pureMsgText[:len(this.command)] == this.command &&
+		pureMsgText[len(this.command)] == ' ' {
 		if !this.PermissionCheck(user) {
 			messageToSend = "Permission denied."
 			goto out
@@ -119,18 +110,18 @@ func (this *PluginManagerPlugin) PluginOperationExecutor(logger func(...any), pu
 
 				break
 			case "help":
-				messageToSend = pluginSystemUsage
+				messageToSend = this.GetHelpMsg()
 				break
 			case "load":
 				fallthrough
 			case "unload":
 				if len(command) == 2 {
-					messageToSend = pluginSystemUsage
+					messageToSend = this.GetHelpMsg()
 					break
 				}
 
 				pluginName := command[2]
-				var plugin *OneBotV11Plugin = nil
+				var plugin *OneBotV11PluginAPI = nil
 				for _, candidate := range *this.pluginSystem.Plugins {
 					if candidate.GetName() == pluginName {
 						plugin = &candidate
@@ -158,7 +149,11 @@ func (this *PluginManagerPlugin) PluginOperationExecutor(logger func(...any), pu
 						messageToSend = "Plugin has already been unloaded"
 					}
 				} else {
-					logger("[Internal Error] Command for /plugin got changed in the procedure, new value: ", command[1])
+					logger(fmt.Sprintf(
+						"[Internal Error] command for %v got changed in the procedure, new value: %v",
+						this.command,
+						command[1]),
+					)
 					messageToSend = "Internal error, please check the log."
 				}
 
@@ -166,6 +161,8 @@ func (this *PluginManagerPlugin) PluginOperationExecutor(logger func(...any), pu
 			default:
 				messageToSend = "Unrecognized sub-command: " + command[1]
 			}
+		} else {
+			messageToSend = this.GetHelpMsg()
 		}
 	} else {
 		return "", false
@@ -176,7 +173,7 @@ out:
 	return messageToSend, true
 }
 
-func (this *PluginManagerPlugin) HandlePrivateMessage(logger func(...any), bot *onebot_v11_impl.V11Bot, privateMsgEvent *onebot_v11_api_event.PrivateMessage) bool {
+func (this *PluginManagerPlugin) HandlePrivateMessage(logger func(...any), bot *onebot_v11_impl.V11Bot, privateMsgEvent *onebot_v11_api_event.PrivateMessage) int64 {
 	var pureMsgText string
 	var messageArray onebot_v11_api_message.MessageArray
 	var messageString onebot_v11_api_message.MessageString
@@ -185,20 +182,20 @@ func (this *PluginManagerPlugin) HandlePrivateMessage(logger func(...any), bot *
 	messageJson, err := json.Marshal(privateMsgEvent.Message)
 	if err != nil {
 		logger("Unable to marshal private message: ", privateMsgEvent.Message)
-		return true
+		return EVENT_IGNORE
 	}
 
 	err = json.Unmarshal(messageJson, &messageArray)
 	if err == nil {
 		pureMsgText, ok = ParsePureTextMessage(logger, messageArray)
 		if !ok {
-			return true
+			return EVENT_IGNORE
 		}
 	} else {
 		err = json.Unmarshal(messageJson, &messageString)
 		if err != nil {
 			logger("Unable to re-unmarshal private message: ", privateMsgEvent.Message)
-			return true
+			return EVENT_IGNORE
 		}
 		pureMsgText = messageString.Message
 	}
@@ -211,13 +208,13 @@ func (this *PluginManagerPlugin) HandlePrivateMessage(logger func(...any), bot *
 			logger("Unable to send message to user ", privateMsgEvent.UserId, " , error: ", err.Error())
 		}
 
-		return false
+		return EVENT_INTERCEPT
 	}
 
-	return true
+	return EVENT_IGNORE
 }
 
-func (this *PluginManagerPlugin) HandleGroupMessage(logger func(...any), bot *onebot_v11_impl.V11Bot, groupMsgEvent *onebot_v11_api_event.GroupMessage) bool {
+func (this *PluginManagerPlugin) HandleGroupMessage(logger func(...any), bot *onebot_v11_impl.V11Bot, groupMsgEvent *onebot_v11_api_event.GroupMessage) int64 {
 	var pureMsgText string
 	var messageArray onebot_v11_api_message.MessageArray
 	var messageString onebot_v11_api_message.MessageString
@@ -226,20 +223,20 @@ func (this *PluginManagerPlugin) HandleGroupMessage(logger func(...any), bot *on
 	messageJson, err := json.Marshal(groupMsgEvent.Message)
 	if err != nil {
 		logger("Unable to marshal group message: ", groupMsgEvent.Message)
-		return true
+		return EVENT_IGNORE
 	}
 
 	err = json.Unmarshal(messageJson, &messageArray)
 	if err == nil {
 		pureMsgText, ok = ParsePureTextMessage(logger, messageArray)
 		if !ok {
-			return true
+			return EVENT_IGNORE
 		}
 	} else {
 		err = json.Unmarshal(messageJson, &messageString)
 		if err != nil {
 			logger("Unable to re-unmarshal group message: ", groupMsgEvent.Message)
-			return true
+			return EVENT_IGNORE
 		}
 		pureMsgText = messageString.Message
 	}
@@ -252,8 +249,8 @@ func (this *PluginManagerPlugin) HandleGroupMessage(logger func(...any), bot *on
 			logger("Unable to send message to group ", groupMsgEvent.GroupId, " , error: ", err.Error())
 		}
 
-		return false
+		return EVENT_INTERCEPT
 	}
 
-	return true
+	return EVENT_IGNORE
 }

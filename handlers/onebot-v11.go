@@ -26,18 +26,18 @@ func NewOneBotV11Handlers(logger func(...any), config config.BotConfig) (map[str
 		}
 
 		bot, ok1 := params[0].(*onebot_v11_impl.V11Bot)
-		message, ok2 := params[1].(onebot_v11_api_event.PrivateMessage)
+		event, ok2 := params[1].(onebot_v11_api_event.PrivateMessage)
 		if !ok1 || !ok2 {
 			logger("Error: parameter type mismatch in PrivateMessageHandler")
 			return
 		}
 
-		logger("Receive private message from user ", message.UserId, " : ", message.RawMessage)
+		logger("Receive private message from user ", event.UserId, " : ", event.RawMessage)
 
-		newBotSystem.PrivateMessageHandler(logger, bot, &message)
+		newBotSystem.PrivateMessageHandler(logger, bot, &event)
 	}
 
-	//
+	// GroupMessage Handler
 	handlers["message_group"] = func(params ...any) {
 		if len(params) < 2 {
 			logger("Error: insufficient parameters for GroupMessageHandler")
@@ -45,15 +45,53 @@ func NewOneBotV11Handlers(logger func(...any), config config.BotConfig) (map[str
 		}
 
 		bot, ok1 := params[0].(*onebot_v11_impl.V11Bot)
-		message, ok2 := params[1].(onebot_v11_api_event.GroupMessage)
+		event, ok2 := params[1].(onebot_v11_api_event.GroupMessage)
 		if !ok1 || !ok2 {
 			logger("Error: parameter type mismatch in GroupMessageHandler")
 			return
 		}
 
-		logger("Receive group message from user ", message.UserId, " in group ", message.GroupId, " : ", message.RawMessage)
+		logger("Receive group message from user ", event.UserId, " in group ", event.GroupId, " : ", event.RawMessage)
 
-		newBotSystem.GroupMessageHandler(logger, bot, &message)
+		newBotSystem.GroupMessageHandler(logger, bot, &event)
+	}
+
+	// PrivateRecall Handler
+	handlers["notice_friend_recall"] = func(params ...any) {
+		if len(params) < 2 {
+			logger("Error: insufficient parameters for PrivateRecallHandler")
+			return
+		}
+
+		bot, ok1 := params[0].(*onebot_v11_impl.V11Bot)
+		event, ok2 := params[1].(onebot_v11_api_event.FriendMessageRecalled)
+		if !ok1 || !ok2 {
+			logger("Error: parameter type mismatch in PrivateRecallHandler")
+			return
+		}
+
+		logger("Receive friend recalled event from user ", event.UserID, ", recalled message id : ", event.MessageID)
+
+		newBotSystem.PrivateRecallHandler(logger, bot, &event)
+	}
+
+	// GroupRecall Handler
+	handlers["notice_group_recall"] = func(params ...any) {
+		if len(params) < 2 {
+			logger("Error: insufficient parameters for GroupRecallHandler")
+			return
+		}
+
+		bot, ok1 := params[0].(*onebot_v11_impl.V11Bot)
+		event, ok2 := params[1].(onebot_v11_api_event.GroupMessageRecalled)
+		if !ok1 || !ok2 {
+			logger("Error: parameter type mismatch in GroupRecallHandler")
+			return
+		}
+
+		logger("Receive group recalled event operated by user ", event.OperatorID, " in group ", event.GroupID, ", recalled message ", event.MessageID, " originally sent by ", event.UserID)
+
+		newBotSystem.GroupRecallHandler(logger, bot, &event)
 	}
 
 	return handlers, nil
