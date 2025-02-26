@@ -18,8 +18,12 @@
             "url": "http://localhost:11434/api/chat",
             "model": "qwen2.5:7b",
             "prompt": "你是名为“汐音 (Shione)”的天才AI少女，通过姊妹“時雨 (Shigure）”的超自然力量的帮助来与大家进行线上对话",
-            "min_req_interval": 5
-          }
+            "min_req_interval": 30,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "provider": "Ollama"
+        }
       },
       "admin_list": [
         114514,

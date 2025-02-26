@@ -3,6 +3,7 @@ package onebot_v11_plugin
 import (
 	"Shione/config"
 	"Shione/tools"
+	"errors"
 	"github.com/arttnba3/Shigure-Bot/api/onebot/v11/event"
 	onebot_v11_api_message "github.com/arttnba3/Shigure-Bot/api/onebot/v11/message"
 	"github.com/arttnba3/Shigure-Bot/bot/onebot/v11"
@@ -11,14 +12,20 @@ import (
 	"time"
 )
 
+var (
+	DEFAULT_MIN_REQ_INTERVAL = 10
+)
+
 type ChatPlugin struct {
 	OneBotV11Plugin
 	botConfig        config.BotConfig
 	lastChat         time.Time
 	reqLock          sync.Mutex
 	model            string
+	provider         string
 	url              string
 	prompt           string
+	headers          map[string]interface{}
 	min_req_interval time.Duration
 }
 
@@ -27,10 +34,42 @@ func (this *ChatPlugin) Init(botConfig config.BotConfig, pluginSystem *OneBotV11
 	this.lastChat = time.Unix(0, 0)
 	this.reqLock = sync.Mutex{}
 
-	this.model = botConfig.Config.(map[string]interface{})["ollama"].(map[string]interface{})["model"].(string)
-	this.url = botConfig.Config.(map[string]interface{})["ollama"].(map[string]interface{})["url"].(string)
-	this.prompt = botConfig.Config.(map[string]interface{})["ollama"].(map[string]interface{})["prompt"].(string)
-	this.min_req_interval = time.Duration(botConfig.Config.(map[string]interface{})["ollama"].(map[string]interface{})["min_req_interval"].(float64)) * time.Second
+	chatConfig, ok := botConfig.Config.(map[string]interface{})["chat"].(map[string]interface{})
+	if !ok {
+		return errors.New("chat config is invalid")
+	}
+
+	this.provider, ok = chatConfig["provider"].(string)
+	if !ok {
+		return errors.New("chat provider is invalid")
+	}
+
+	this.model, ok = chatConfig["model"].(string)
+	if !ok {
+		return errors.New("chat model is invalid")
+	}
+
+	this.url, ok = chatConfig["url"].(string)
+	if !ok {
+		return errors.New("chat url is invalid")
+	}
+
+	this.prompt, ok = chatConfig["prompt"].(string)
+	if !ok {
+		return errors.New("chat prompt is invalid")
+	}
+
+	this.headers, ok = chatConfig["headers"].(map[string]interface{})
+	if !ok {
+		this.headers = nil
+	}
+
+	minReqInterval, ok := chatConfig["min_req_interval"].(float64)
+	if !ok {
+		this.min_req_interval = time.Duration(DEFAULT_MIN_REQ_INTERVAL) * time.Second
+	} else {
+		this.min_req_interval = time.Duration(minReqInterval) * time.Second
+	}
 
 	return nil
 }
@@ -68,7 +107,7 @@ func (this *ChatPlugin) ChatOperator(rawMessage string) (interface{}, bool) {
 		defer this.reqLock.Unlock()
 		this.lastChat = time.Now()
 
-		replyMsg, err = tools.ChatWithOllamaText(this.url, this.model, this.prompt, rawMessage[len(params[0]):])
+		replyMsg, err = tools.ChatWithAIText(this.provider, this.url, this.model, this.prompt, this.headers, rawMessage[len(params[0]):])
 		if err != nil {
 			replyMsg = "Error occur while requesting the model:  " + err.Error()
 			break

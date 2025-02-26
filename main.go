@@ -190,6 +190,7 @@ func ConfigInit() (*config.ShioneConfig, error) {
 
 func BotInit(logger func(params ...any), config config.BotConfig) (*shigure.ShigureBot, error) {
 	var bot *shigure.ShigureBot
+	var botHandlers map[string]func(params ...any)
 	var err error
 	var configJson []byte
 
@@ -201,7 +202,7 @@ func BotInit(logger func(params ...any), config config.BotConfig) (*shigure.Shig
 
 	switch config.Type {
 	case "OneBot-V11":
-		botHandlers, err := handlers.NewOneBotV11Handlers(logger, config)
+		botHandlers, err = handlers.NewOneBotV11Handlers(logger, config)
 		if err != nil {
 			break
 		}
