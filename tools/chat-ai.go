@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/httputil"
 	"strconv"
 	"strings"
 )
@@ -19,8 +18,6 @@ func ParseOpenRouterReply(rawReplyMsg []byte) (string, error) {
 	if err != nil {
 		return "", errors.New(fmt.Sprintf("Error parsing reply: %v, original reply data:\n%v", err.Error(), rawReplyMsg))
 	}
-
-	fmt.Println(respJson)
 
 	respChoice, ok := respJson["choices"].([]interface{})
 	if !ok {
@@ -96,9 +93,6 @@ func ChatWithAI(provider string, url string, model string, prompt string, header
 			req.Header.Set(k, v.(string))
 		}
 	}
-
-	requestDump, err := httputil.DumpRequest(req, true)
-	fmt.Println(string(requestDump))
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
