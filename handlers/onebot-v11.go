@@ -34,7 +34,7 @@ func NewOneBotV11Handlers(logger func(...any), config config.BotConfig) (map[str
 
 		logger("Receive private message from user ", event.UserId, " : ", event.RawMessage)
 
-		newBotSystem.PrivateMessageHandler(logger, bot, &event)
+		go newBotSystem.PrivateMessageHandler(logger, bot, &event)
 	}
 
 	// GroupMessage Handler
@@ -53,7 +53,7 @@ func NewOneBotV11Handlers(logger func(...any), config config.BotConfig) (map[str
 
 		logger("Receive group message from user ", event.UserId, " in group ", event.GroupId, " : ", event.RawMessage)
 
-		newBotSystem.GroupMessageHandler(logger, bot, &event)
+		go newBotSystem.GroupMessageHandler(logger, bot, &event)
 	}
 
 	// PrivateRecall Handler
@@ -72,7 +72,7 @@ func NewOneBotV11Handlers(logger func(...any), config config.BotConfig) (map[str
 
 		logger("Receive friend recalled event from user ", event.UserID, ", recalled message id : ", event.MessageID)
 
-		newBotSystem.PrivateRecallHandler(logger, bot, &event)
+		go newBotSystem.PrivateRecallHandler(logger, bot, &event)
 	}
 
 	// GroupRecall Handler
@@ -91,7 +91,7 @@ func NewOneBotV11Handlers(logger func(...any), config config.BotConfig) (map[str
 
 		logger("Receive group recalled event operated by user ", event.OperatorID, " in group ", event.GroupID, ", recalled message ", event.MessageID, " originally sent by ", event.UserID)
 
-		newBotSystem.GroupRecallHandler(logger, bot, &event)
+		go newBotSystem.GroupRecallHandler(logger, bot, &event)
 	}
 
 	return handlers, nil

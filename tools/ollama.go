@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 func ChatWithOllama(url string, model string, prompt string, messages interface{}) (string, error) {
@@ -51,6 +52,14 @@ func ChatWithOllama(url string, model string, prompt string, messages interface{
 		}
 
 		respMsg += respJson["message"].(map[string]interface{})["content"].(string)
+	}
+
+	// DeepSeek model will always output this, but we do not need...
+	if len(respMsg) > len("<think>") && respMsg[:len("<think>")] == "<think>" {
+		splitRes := strings.Split(respMsg, "</think>\n")
+		if len(splitRes) > 1 {
+			respMsg = splitRes[1]
+		}
 	}
 
 	return respMsg, nil

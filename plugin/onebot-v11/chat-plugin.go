@@ -13,22 +13,24 @@ import (
 
 type ChatPlugin struct {
 	OneBotV11Plugin
-	botConfig config.BotConfig
-	lastChat  time.Time
-	reqLock   sync.Mutex
-	model     string
-	url       string
-	prompt    string
+	botConfig        config.BotConfig
+	lastChat         time.Time
+	reqLock          sync.Mutex
+	model            string
+	url              string
+	prompt           string
+	min_req_interval time.Duration
 }
 
 func (this *ChatPlugin) Init(botConfig config.BotConfig, pluginSystem *OneBotV11PluginSystem) error {
 	this.botConfig = botConfig
-	this.lastChat = time.Now()
+	this.lastChat = time.Unix(0, 0)
 	this.reqLock = sync.Mutex{}
 
 	this.model = botConfig.Config.(map[string]interface{})["ollama"].(map[string]interface{})["model"].(string)
 	this.url = botConfig.Config.(map[string]interface{})["ollama"].(map[string]interface{})["url"].(string)
 	this.prompt = botConfig.Config.(map[string]interface{})["ollama"].(map[string]interface{})["prompt"].(string)
+	this.min_req_interval = time.Duration(botConfig.Config.(map[string]interface{})["ollama"].(map[string]interface{})["min_req_interval"].(float64)) * time.Second
 
 	return nil
 }
@@ -57,15 +59,16 @@ func (this *ChatPlugin) ChatOperator(rawMessage string) (interface{}, bool) {
 			break
 		}
 
-		if time.Now().Sub(this.lastChat) < 1*time.Second {
+		if time.Now().Sub(this.lastChat) < this.min_req_interval {
 			replyMsg = "Request frequency is too fast."
 			break
 		}
 
 		this.reqLock.Lock()
 		defer this.reqLock.Unlock()
+		this.lastChat = time.Now()
 
-		replyMsg, err = tools.ChatWithOllamaText(this.url, this.model, this.prompt, params[1])
+		replyMsg, err = tools.ChatWithOllamaText(this.url, this.model, this.prompt, rawMessage[len(params[0]):])
 		if err != nil {
 			replyMsg = "Error occur while requesting the model:  " + err.Error()
 			break
