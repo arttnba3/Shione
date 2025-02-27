@@ -108,9 +108,6 @@ func (this *OneBotV11PluginSystem) PluginSystemInit(botConfig config.BotConfig) 
 }
 
 func (this *OneBotV11PluginSystem) PrivateMessageHandler(logger func(...any), bot *onebot_v11_impl.V11Bot, privateMsgEvent *onebot_v11_api_event.PrivateMessage) {
-	this.PluginLock.Lock()
-	defer this.PluginLock.Unlock()
-
 	for _, plugin := range *this.Plugins {
 		if !plugin.IsEnabled() {
 			continue
@@ -123,9 +120,6 @@ func (this *OneBotV11PluginSystem) PrivateMessageHandler(logger func(...any), bo
 }
 
 func (this *OneBotV11PluginSystem) GroupMessageHandler(logger func(...any), bot *onebot_v11_impl.V11Bot, groupMsgEvent *onebot_v11_api_event.GroupMessage) {
-	this.PluginLock.Lock()
-	defer this.PluginLock.Unlock()
-
 	for _, plugin := range *this.Plugins {
 		if !plugin.IsEnabled() {
 			continue
