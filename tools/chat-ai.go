@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func ParseOpenRouterReply(rawReplyMsg []byte) (string, error) {
@@ -21,7 +22,18 @@ func ParseOpenRouterReply(rawReplyMsg []byte) (string, error) {
 
 	respChoice, ok := respJson["choices"].([]interface{})
 	if !ok {
-		return "", errors.New("unexpected response format1")
+		respError, ok := respJson["error"].(map[string]interface{})
+		if !ok {
+			return "", errors.New(fmt.Sprintf("unexpected response format1, original reply data: %v", rawReplyMsg))
+		} else {
+			respErrorMsg, ok := respError["message"].(string)
+			if !ok {
+				return "", errors.New(fmt.Sprintf("unexpected response format2, original reply data: %v", rawReplyMsg))
+			} else {
+				return "", errors.New(respErrorMsg)
+			}
+
+		}
 	}
 
 	if len(respChoice) == 0 {
@@ -30,12 +42,12 @@ func ParseOpenRouterReply(rawReplyMsg []byte) (string, error) {
 
 	respMessage, ok := respChoice[0].(map[string]interface{})
 	if !ok {
-		return "", errors.New("unexpected response format2")
+		return "", errors.New(fmt.Sprintf("unexpected response format3, original reply data: %v", rawReplyMsg))
 	}
 
 	respMessageMsg, ok := respMessage["message"].(map[string]interface{})
 	if !ok {
-		return "", errors.New("unexpected response format3")
+		return "", errors.New(fmt.Sprintf("unexpected response format4, original reply data: %v", rawReplyMsg))
 	}
 
 	return respMessageMsg["content"].(string), nil
@@ -71,7 +83,7 @@ func ParseOLLAMAReply(rawReplyMsg []byte) (string, error) {
 	return respMsg, nil
 }
 
-func ChatWithAI(provider string, url string, model string, prompt string, headers map[string]interface{}, messages interface{}) (string, error) {
+func ChatWithAI(provider string, url string, model string, prompt string, headers map[string]interface{}, maxWaitingTime time.Duration, messages interface{}) (string, error) {
 	reqData := make(map[string]interface{})
 	//reqData["prompt"] = prompt
 	reqData["model"] = model
@@ -94,7 +106,9 @@ func ChatWithAI(provider string, url string, model string, prompt string, header
 		}
 	}
 
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: maxWaitingTime,
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
@@ -126,7 +140,8 @@ func ChatWithAI(provider string, url string, model string, prompt string, header
 			return "", err
 		}
 		if len(respMsg) == 0 { // sometimes it occur, just do the request again
-			return ChatWithAI(provider, url, model, prompt, headers, messages)
+			time.Sleep(time.Second * 1)
+			return ChatWithAI(provider, url, model, prompt, headers, maxWaitingTime, messages)
 		}
 		break
 	default:
@@ -136,7 +151,7 @@ func ChatWithAI(provider string, url string, model string, prompt string, header
 	return respMsg, nil
 }
 
-func ChatWithAIText(provider string, url string, model string, prompt string, headers map[string]interface{}, message string) (string, error) {
+func ChatWithAIText(provider string, url string, model string, prompt string, headers map[string]interface{}, maxWaitingTime time.Duration, message string) (string, error) {
 	messages := []map[string]string{
 		{
 			"role":    "system",
@@ -148,5 +163,5 @@ func ChatWithAIText(provider string, url string, model string, prompt string, he
 		},
 	}
 
-	return ChatWithAI(provider, url, model, prompt, headers, messages)
+	return ChatWithAI(provider, url, model, prompt, headers, maxWaitingTime, messages)
 }

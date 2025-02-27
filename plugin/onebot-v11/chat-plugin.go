@@ -14,19 +14,21 @@ import (
 
 var (
 	DEFAULT_MIN_REQ_INTERVAL = 10
+	DEFAULT_MAX_WAITING_TIME = 60
 )
 
 type ChatPlugin struct {
 	OneBotV11Plugin
-	botConfig        config.BotConfig
-	lastChat         time.Time
-	reqLock          sync.Mutex
-	model            string
-	provider         string
-	url              string
-	prompt           string
-	headers          map[string]interface{}
-	min_req_interval time.Duration
+	botConfig      config.BotConfig
+	lastChat       time.Time
+	reqLock        sync.Mutex
+	model          string
+	provider       string
+	url            string
+	prompt         string
+	headers        map[string]interface{}
+	minReqInterval time.Duration
+	maxWaitingTime time.Duration
 }
 
 func (this *ChatPlugin) Init(botConfig config.BotConfig, pluginSystem *OneBotV11PluginSystem) error {
@@ -66,9 +68,16 @@ func (this *ChatPlugin) Init(botConfig config.BotConfig, pluginSystem *OneBotV11
 
 	minReqInterval, ok := chatConfig["min_req_interval"].(float64)
 	if !ok {
-		this.min_req_interval = time.Duration(DEFAULT_MIN_REQ_INTERVAL) * time.Second
+		this.minReqInterval = time.Duration(DEFAULT_MIN_REQ_INTERVAL) * time.Second
 	} else {
-		this.min_req_interval = time.Duration(minReqInterval) * time.Second
+		this.minReqInterval = time.Duration(minReqInterval) * time.Second
+	}
+
+	maxWaitingTime, ok := chatConfig["max_waiting_time"].(float64)
+	if !ok {
+		this.maxWaitingTime = time.Duration(DEFAULT_MAX_WAITING_TIME) * time.Second
+	} else {
+		this.maxWaitingTime = time.Duration(maxWaitingTime) * time.Second
 	}
 
 	return nil
@@ -98,16 +107,16 @@ func (this *ChatPlugin) ChatOperator(rawMessage string) (interface{}, bool) {
 			break
 		}
 
-		if time.Now().Sub(this.lastChat) < this.min_req_interval {
+		if time.Now().Sub(this.lastChat) < this.minReqInterval {
 			replyMsg = "Request frequency is too fast."
 			break
 		}
 
 		this.reqLock.Lock()
-		defer this.reqLock.Unlock()
 		this.lastChat = time.Now()
+		this.reqLock.Unlock()
 
-		replyMsg, err = tools.ChatWithAIText(this.provider, this.url, this.model, this.prompt, this.headers, rawMessage[len(params[0]):])
+		replyMsg, err = tools.ChatWithAIText(this.provider, this.url, this.model, this.prompt, this.headers, this.maxWaitingTime, rawMessage[len(params[0]):])
 		if err != nil {
 			replyMsg = "Error occur while requesting the model:  " + err.Error()
 			break
