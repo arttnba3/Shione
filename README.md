@@ -1,6 +1,7 @@
 <div align="center">
 
-<a href="https://smms.app/image/9ubOQ1BDmMLCJFe" target="_blank"><img src="https://s2.loli.net/2025/02/22/9ubOQ1BDmMLCJFe.jpg" ></a>
+<a href="https://smms.app/image/PeUCls9am7BSkFi" target="_blank"><img src="https://s2.loli.net/2025/03/06/PeUCls9am7BSkFi.png" ></a>
+
 # 汐音 (Shione)
 
 🐈Yet another chatbot application based on [Shigure-Bot](https://github.com/arttnba3/Shigure-Bot).🐧
