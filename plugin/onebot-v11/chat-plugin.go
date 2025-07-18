@@ -3,6 +3,7 @@ package onebot_v11_plugin
 import (
 	"Shione/config"
 	"Shione/tools"
+	"encoding/json"
 	"errors"
 	"github.com/arttnba3/Shigure-Bot/api/onebot/v11/event"
 	onebot_v11_api_message "github.com/arttnba3/Shigure-Bot/api/onebot/v11/message"
@@ -172,20 +173,32 @@ func (this *ChatPlugin) HandlePrivateMessage(logger func(...any), bot *onebot_v1
 
 func (this *ChatPlugin) HandleGroupMessage(logger func(...any), bot *onebot_v11_impl.V11Bot, groupMsgEvent *onebot_v11_api_event.GroupMessage) int64 {
 	var replyMsg onebot_v11_api_message.MessageArray
+	var groupMsgArray onebot_v11_api_message.MessageArray
+	var rawMsg string = ""
+	var hasAtBot bool = false
 
-	rawMsg := ""
-	hasAtBot := false
-	groupMsg := groupMsgEvent.Message.([]onebot_v11_api_message.MessageSegment)
-	for _, msg := range groupMsg {
+	messageJson, err := json.Marshal(groupMsgEvent.Message)
+	if err != nil {
+		logger("Unable to marshal group message: ", groupMsgEvent.Message)
+		return EVENT_IGNORE
+	}
+
+	err = json.Unmarshal(messageJson, &groupMsgArray)
+	if err != nil {
+		logger("Unable to re-unmarshal group message: ", groupMsgEvent.Message)
+		return EVENT_IGNORE
+	}
+
+	for _, msg := range groupMsgArray {
 		if msg.Type == "at" {
-			data, ok := msg.Data.(onebot_v11_api_message.MessageSegmentDataAt)
+			data, ok := msg.Data.(map[string]interface{})["qq"].(string)
 			if ok {
-				if data.QQ == this.botConfig.BotQQ {
+				if data == this.botConfig.BotQQ {
 					hasAtBot = true
 				}
 			}
 		} else if msg.Type == "text" {
-			rawMsg += msg.Data.(onebot_v11_api_message.MessageSegmentDataText).Text
+			rawMsg += msg.Data.(map[string]interface{})["text"].(string)
 		}
 	}
 
@@ -193,7 +206,7 @@ func (this *ChatPlugin) HandleGroupMessage(logger func(...any), bot *onebot_v11_
 		rawMsg = groupMsgEvent.RawMessage
 	}
 
-	AIReplyMsgRaw, intercept := this.ChatOperator(rawMsg, false)
+	AIReplyMsgRaw, intercept := this.ChatOperator(rawMsg, hasAtBot)
 	AIReplyMsg, _ := AIReplyMsgRaw.(onebot_v11_api_message.MessageArray)
 	if intercept {
 		if groupMsgEvent.Anonymous == nil {
