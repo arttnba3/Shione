@@ -3,6 +3,7 @@ package config
 type BotConfig struct {
 	Type      string      `json:"type"`
 	AdminList []int64     `json:"admin_list"`
+	BotQQ     string      `json:"bot_qq"`
 	Config    interface{} `json:"config"`
 }
 

@@ -91,11 +91,29 @@ func (this *ChatPlugin) GetHelpMsg() string {
 		"Redundant arguments will be automatically ignored\n"
 }
 
-func (this *ChatPlugin) ChatOperator(rawMessage string) (interface{}, bool) {
+func (this *ChatPlugin) ChatOperator(rawMessage string, hasParsed bool) (interface{}, bool) {
 	var replyMsg string
 	var err error
+	var params []string
 
-	params := tools.TextParser(rawMessage)
+	if hasParsed {
+		if time.Now().Sub(this.lastChat) < this.minReqInterval {
+			replyMsg = "Request frequency is too fast."
+		} else {
+			this.reqLock.Lock()
+			this.lastChat = time.Now()
+			this.reqLock.Unlock()
+
+			replyMsg, err = tools.ChatWithAIText(this.provider, this.url, this.model, this.prompt, this.headers, this.maxWaitingTime, rawMessage)
+			if err != nil {
+				replyMsg = "Error occur while requesting the model:  " + err.Error()
+			}
+		}
+
+		goto REPLY
+	}
+
+	params = tools.TextParser(rawMessage)
 	if len(params) == 0 {
 		return nil, false
 	}
@@ -127,6 +145,7 @@ func (this *ChatPlugin) ChatOperator(rawMessage string) (interface{}, bool) {
 		return nil, false
 	}
 
+REPLY:
 	return onebot_v11_api_message.MessageArray{
 		onebot_v11_api_message.MessageSegment{
 			Type: "text",
@@ -138,7 +157,7 @@ func (this *ChatPlugin) ChatOperator(rawMessage string) (interface{}, bool) {
 }
 
 func (this *ChatPlugin) HandlePrivateMessage(logger func(...any), bot *onebot_v11_impl.V11Bot, privateMsgEvent *onebot_v11_api_event.PrivateMessage) int64 {
-	replyMsg, intercept := this.ChatOperator(privateMsgEvent.RawMessage)
+	replyMsg, intercept := this.ChatOperator(privateMsgEvent.RawMessage, false)
 	if intercept {
 		_, err := bot.SendPrivateMsg(privateMsgEvent.UserId, replyMsg, false)
 		if err != nil {
@@ -154,8 +173,28 @@ func (this *ChatPlugin) HandlePrivateMessage(logger func(...any), bot *onebot_v1
 func (this *ChatPlugin) HandleGroupMessage(logger func(...any), bot *onebot_v11_impl.V11Bot, groupMsgEvent *onebot_v11_api_event.GroupMessage) int64 {
 	var replyMsg onebot_v11_api_message.MessageArray
 
-	ollamaReplyMsgRaw, intercept := this.ChatOperator(groupMsgEvent.RawMessage)
-	ollamaReplyMsg, _ := ollamaReplyMsgRaw.(onebot_v11_api_message.MessageArray)
+	rawMsg := ""
+	hasAtBot := false
+	groupMsg := groupMsgEvent.Message.([]onebot_v11_api_message.MessageSegment)
+	for _, msg := range groupMsg {
+		if msg.Type == "at" {
+			data, ok := msg.Data.(onebot_v11_api_message.MessageSegmentDataAt)
+			if ok {
+				if data.QQ == this.botConfig.BotQQ {
+					hasAtBot = true
+				}
+			}
+		} else if msg.Type == "text" {
+			rawMsg += msg.Data.(onebot_v11_api_message.MessageSegmentDataText).Text
+		}
+	}
+
+	if !hasAtBot {
+		rawMsg = groupMsgEvent.RawMessage
+	}
+
+	AIReplyMsgRaw, intercept := this.ChatOperator(rawMsg, false)
+	AIReplyMsg, _ := AIReplyMsgRaw.(onebot_v11_api_message.MessageArray)
 	if intercept {
 		if groupMsgEvent.Anonymous == nil {
 			replyMsg = onebot_v11_api_message.MessageArray{
@@ -166,9 +205,9 @@ func (this *ChatPlugin) HandleGroupMessage(logger func(...any), bot *onebot_v11_
 					},
 				},
 			}
-			replyMsg = append(replyMsg, ollamaReplyMsg...)
+			replyMsg = append(replyMsg, AIReplyMsg...)
 		} else {
-			replyMsg = ollamaReplyMsg
+			replyMsg = AIReplyMsg
 		}
 
 		_, err := bot.SendGroupMsg(groupMsgEvent.GroupId, replyMsg, false)
